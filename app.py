@@ -16,9 +16,13 @@ html_content = """
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>اتوموبی اتومیشن</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@100..900&display=swap" rel="stylesheet">
     <style>
         body {
-            font-family: 'Arial', sans-serif;
+            font-family: 'Vazirmatn', sans-serif, 'Arial';
+            font-weight: 100;
             background-color: #f5f5f5;
             display: flex;
             flex-direction: column;
@@ -100,9 +104,12 @@ form_to_json = """
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>اتوموبی اتومیشن</title>
+      <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@100..900&display=swap" rel="stylesheet">
   <style>
     body {
-      font-family: sans-serif;
+      font-family: 'Vazirmatn', sans-serif;
       background: #f9fafb;
       margin: 0;
       padding: 20px;
@@ -362,8 +369,11 @@ def index():
     <head>
       <meta charset="UTF-8">
       <title>اتوموبی اتومیشن</title>
+          <link rel="preconnect" href="https://fonts.googleapis.com">
+          <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+          <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@100..900&display=swap" rel="stylesheet">
       <style>
-        body { font-family: Tahoma, Arial; direction: rtl; text-align: right; margin: 20px; background: #f5f5f5; }
+        body { font-family: 'Vazirmatn', Arial; direction: rtl; text-align: right; margin: 20px; background: #f5f5f5; }
         h1 { color: purple; text-align: center; margin-bottom: 5px; }
         .title-line { width: 50%; height: 4px; background: purple; border-radius: 20px; margin: 0 auto 20px auto; }
         input { padding: 10px; font-size: 16px; border-radius: 5px; border: 1px solid #ccc; width: 70%; }
@@ -539,6 +549,7 @@ def scrape():
                         continue
                     seen_urls.add(url)
                     try:
+                        time.sleep(0.5)
                         product = extract_product_data(url)
                         yield f"data: {json.dumps({'type': 'PDP_PROGRESS', 'data': product})}\n\n"
                     except Exception as e:
@@ -559,4 +570,4 @@ def scrape():
 
 
 if __name__ == "__main__":
-    app.run(debug=True, threaded=True)
+    app.run(host="0.0.0.0", port=80, debug=True, threaded=True)
