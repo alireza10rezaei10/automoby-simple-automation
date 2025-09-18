@@ -1,16 +1,12 @@
-FROM nginx:alpine
+FROM python:3.12-slim
 
-# حذف کانفیگ پیش‌فرض
-RUN rm /etc/nginx/conf.d/default.conf
+WORKDIR /app
 
-# کپی کانفیگ جدید
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+COPY requirements.txt .
+COPY app.py .
 
-# کپی کل پروژه
-COPY . /usr/share/nginx/html
+RUN pip install --no-cache-dir -r requirements.txt
 
-# expose پورت
-EXPOSE 80
+EXPOSE 5000
 
-# اجرا
-CMD ["nginx", "-g", "daemon off;"]
+CMD ["python", "app.py"]
