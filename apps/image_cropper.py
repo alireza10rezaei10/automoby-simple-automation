@@ -66,14 +66,20 @@ body { font-family: 'Vazirmatn', Arial; direction: rtl; text-align: center; marg
 h1 { color: purple; margin-bottom: 5px; }
 .title-line { width: 50%; height: 4px; background: purple; border-radius: 20px; margin: 0 auto 20px auto; }
 
-#drop-zone { width: 100%; max-width: 512px; height: 200px; border: 2px dashed purple; border-radius: 10px; margin: auto; display: flex; align-items: center; justify-content: center; color: #666; cursor: pointer; background: #fff; text-align: center; padding: 10px; position: relative; overflow: hidden; }
+#drop-zone { 
+    width: 100%; max-width: 512px; height: 200px; 
+    border: 2px dashed purple; border-radius: 10px; 
+    margin: auto; display: flex; align-items: center; justify-content: center; 
+    color: #666; cursor: pointer; background: #fff; text-align: center; 
+    padding: 10px; position: relative; overflow: hidden; transition: 0.3s; 
+}
 #drop-zone.dragover { background: #f0e6ff; border-color: #800080; }
+
 #drop-zone img { max-height: 100%; max-width: 100%; border-radius: 6px; display: block; margin: auto; }
 .remove-btn {
     position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
+    top: 10px;
+    right: 10px;
     background: rgba(255,0,0,0.8);
     color: white;
     border: none;
@@ -87,6 +93,7 @@ h1 { color: purple; margin-bottom: 5px; }
     align-items: center;
     justify-content: center;
     padding: 0;
+    z-index: 5;
 }
 
 button { padding: 10px 0; font-size: 18px; border-radius: 8px; border: none; background: purple; color: white; cursor: pointer; margin-top: 15px; display: block; margin-left: auto; margin-right: auto; width: 40%; }
@@ -96,15 +103,45 @@ button:hover { background: #800080; }
 #output img { display: block; margin: auto; border-radius: 6px; }
 
 .container { max-width: 800px; margin: auto; padding: 20px; background: white; border-radius: 10px; box-shadow: 0 0 15px rgba(0,0,0,0.1); }
-
 input[type=file] { display: none; }
+
+/* بلور و اسپینر */
+#drop-zone.loading img,
+#drop-zone.loading span,
+#drop-zone.loading .remove-btn {
+    filter: blur(3px);
+    pointer-events: none;
+}
+
+#spinner {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    border: 6px solid #f3f3f3;
+    border-top: 6px solid purple;
+    border-radius: 50%;
+    width: 50px;
+    height: 50px;
+    animation: spin 1s linear infinite;
+    display: none;
+    z-index: 10;
+}
+
+@keyframes spin {
+    0% { transform: translate(-50%, -50%) rotate(0deg); }
+    100% { transform: translate(-50%, -50%) rotate(360deg); }
+}
 </style>
 </head>
 <body>
 <h1>کراپ هوشمند تصویر</h1>
 <div class="title-line"></div>
 <div class="container">
-    <label id="drop-zone">تصویر خود را پیست کنید، بکشید یا انتخاب کنید</label>
+    <label id="drop-zone">
+        تصویر خود را پیست کنید، بکشید یا انتخاب کنید
+        <div id="spinner"></div>
+    </label>
     <input type="file" id="imageInput" accept="image/*">
     <button onclick="cropImage()">کراپ</button>
     <div id="output"></div>
@@ -116,6 +153,7 @@ let selectedFile = null;
 const dropZone = document.getElementById('drop-zone');
 const fileInput = document.getElementById('imageInput');
 const outputDiv = document.getElementById('output');
+const spinner = document.getElementById('spinner');
 
 // کلیک روی drop zone باز کردن فایل
 dropZone.addEventListener('click', () => { if(!selectedFile) fileInput.click(); });
@@ -162,16 +200,22 @@ function setSelectedFile(file){
     removeBtn.onclick = (e) => {
         e.stopPropagation(); // جلوگیری از باز شدن فایل منیجر
         selectedFile = null;
-        dropZone.innerHTML = 'تصویر خود را پیست کنید یا بکشید';
+        dropZone.innerHTML = 'تصویر خود را پیست کنید، بکشید یا انتخاب کنید';
         outputDiv.style.display = 'none';
     };
     dropZone.appendChild(removeBtn);
 
+    dropZone.appendChild(spinner);
     outputDiv.style.display = 'none';
 }
 
 function cropImage() {
     if(!selectedFile) return alert('لطفا ابتدا یک تصویر انتخاب یا کشیده شود!');
+    
+    // فعال کردن بلور و اسپینر
+    dropZone.classList.add('loading');
+    spinner.style.display = 'block';
+
     const formData = new FormData();
     formData.append('image', selectedFile);
 
@@ -182,7 +226,12 @@ function cropImage() {
         outputDiv.innerHTML = `<img src="${url}" alt="Cropped" width="512" height="512">`;
         outputDiv.style.display = 'inline-block';
     })
-    .catch(err => alert('خطا در پردازش تصویر!'));
+    .catch(err => alert('خطا در پردازش تصویر!'))
+    .finally(() => {
+        // برداشتن بلور و اسپینر
+        dropZone.classList.remove('loading');
+        spinner.style.display = 'none';
+    });
 }
 </script>
 </body>
