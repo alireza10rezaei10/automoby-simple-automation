@@ -10,8 +10,7 @@ from apps import (
     form_to_json,
     main,
     digi_attributes_scraping,
-    image_cropper,
-    simple_watermark,
+    photoshop,
 )
 import cv2
 import numpy as np
@@ -53,56 +52,51 @@ def scrape():
 
 
 # ---------------------------------
-# image cropper -------------------
+# photoshop -----------------------
 # ---------------------------------
-@app.route("/image-cropper")
-def cropper_main():
-    return render_template_string(image_cropper.html_ui)
+@app.route("/photoshop")
+def photoshop_main():
+    return render_template_string(photoshop.html_ui)
 
 
-@app.route("/crop", methods=["POST"])
-def crop():
+@app.route("/apply-all", methods=["POST"])
+def apply_all():
     if "image" not in request.files:
         return jsonify({"error": "No file uploaded"}), 400
+
     file = request.files["image"]
-    buffer = image_cropper.place_subject_center_white_bg_full(file.read())
-    return send_file(
-        buffer, mimetype="image/jpeg", as_attachment=False, download_name="cropped.jpg"
+    filename = file.filename
+    image_data = file.read()
+
+    crop_coords = None
+    if all(key in request.form for key in ["x1_c", "y1_c", "x2_c", "y2_c"]):
+        crop_coords = (
+            int(request.form["x1_c"]),
+            int(request.form["y1_c"]),
+            int(request.form["x2_c"]),
+            int(request.form["y2_c"]),
+        )
+
+    watermark_coords = None
+    if all(key in request.form for key in ["x1_w", "y1_w", "x2_w", "y2_w", "color"]):
+        watermark_coords = (
+            int(request.form["x1_w"]),
+            int(request.form["y1_w"]),
+            int(request.form["x2_w"]),
+            int(request.form["y2_w"]),
+        )
+        color = request.form["color"]
+
+    buffer = photoshop.apply_combined(
+        image_data,
+        crop_coords,
+        watermark_coords,
+        color if watermark_coords else "#ffffff",
     )
-
-
-# ---------------------------------
-# simple watermark ----------------
-# ---------------------------------
-@app.route("/simple-watermark")
-def simple_watermark_main():
-    return render_template_string(simple_watermark.html_ui)
-
-
-@app.route("/apply-box", methods=["POST"])
-@app.route("/apply-box", methods=["POST"])
-def apply_box():
-    if "image" not in request.files:
-        return jsonify({"error": "No file uploaded"}), 400
-
-    file = request.files["image"]
-    filename = file.filename  # نام اصلی فایل
-    x1 = int(request.form.get("x1", 0))
-    y1 = int(request.form.get("y1", 0))
-    x2 = int(request.form.get("x2", 0))
-    y2 = int(request.form.get("y2", 0))
-    color = request.form.get("color", "#ff0000")
-
-    buffer = simple_watermark.apply_colored_box(file.read(), x1, y1, x2, y2, color)
-
-    # تشخیص فرمت برای mimetype
-    img_out = Image.open(buffer)
-    format_in = img_out.format
-    buffer.seek(0)
 
     return send_file(
         buffer,
-        mimetype=f"image/{format_in.lower()}",
+        mimetype="image/jpeg",
         as_attachment=False,
         download_name=filename,
     )

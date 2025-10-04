@@ -1,11 +1,47 @@
-# apps/simple_watermark.py
+# apps/photoshop.py
 import cv2
 import numpy as np
 from io import BytesIO
 from PIL import Image
 
 
-# ---------------- Function ----------------
+# ---------------- Crop Box Function ----------------
+def crop_to_box(image_data: bytes, x1: int, y1: int, x2: int, y2: int):
+    # Load image with OpenCV
+    nparr = np.frombuffer(image_data, np.uint8)
+    img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+    if img is None:
+        raise ValueError("Invalid image data")
+
+    # Normalize coords
+    h, w = img.shape[:2]
+    x1 = max(0, min(w - 1, int(x1)))
+    x2 = max(0, min(w - 1, int(x2)))
+    y1 = max(0, min(h - 1, int(y1)))
+    y2 = max(0, min(h - 1, int(y2)))
+
+    # Ensure x1 < x2 and y1 < y2
+    if x1 > x2:
+        x1, x2 = x2, x1
+    if y1 > y2:
+        y1, y2 = y2, y1
+
+    # Crop the image
+    cropped = img[y1 : y2 + 1, x1 : x2 + 1]
+
+    # Resize to 512x512
+    resized = cv2.resize(cropped, (512, 512), interpolation=cv2.INTER_LANCZOS4)
+
+    # Convert to PIL and save as JPEG
+    img_rgb = cv2.cvtColor(resized, cv2.COLOR_BGR2RGB)
+    img_pil = Image.fromarray(img_rgb)
+    buffer = BytesIO()
+    img_pil.save(buffer, format="JPEG", quality=100)
+    buffer.seek(0)
+    return buffer
+
+
+# ---------------- Box Function ----------------
 def apply_colored_box(
     image_data: bytes, x1: int, y1: int, x2: int, y2: int, color_hex: str
 ):
@@ -44,6 +80,34 @@ def apply_colored_box(
     img_out.save(buffer, format=format_in, **save_kwargs)
     buffer.seek(0)
     return buffer
+
+
+# ---------------- Combined Function ----------------
+def apply_combined(
+    image_data: bytes, crop_coords=None, watermark_coords=None, color_hex="#ffffff"
+):
+    # Start with original image data
+    current_data = image_data
+
+    # Apply watermark if provided
+    if watermark_coords:
+        x1_w, y1_w, x2_w, y2_w = watermark_coords
+        current_data = apply_colored_box(
+            current_data, x1_w, y1_w, x2_w, y2_w, color_hex
+        ).getvalue()
+
+    # Apply crop if provided
+    if crop_coords:
+        x1_c, y1_c, x2_c, y2_c = crop_coords
+        result_buffer = crop_to_box(current_data, x1_c, y1_c, x2_c, y2_c)
+    else:
+        # If no crop, save the current_data as JPEG
+        img = Image.open(BytesIO(current_data))
+        result_buffer = BytesIO()
+        img.save(result_buffer, format="JPEG", quality=95)
+        result_buffer.seek(0)
+
+    return result_buffer
 
 
 # ---------------- HTML ----------------
@@ -108,8 +172,20 @@ input[type=file] { display: none; }
     display: none;
     z-index: 40;
 }
-button { padding: 10px 20px; font-size: 16px; border-radius: 8px; border: none; background: purple; color: white; cursor: pointer; margin-top: 15px; }
+.crop-box {
+    border-color: #4CAF50 !important;
+    background: rgba(76, 175, 80, 0.2) !important;
+}
+.watermark-box {
+    border-color: #f44336 !important;
+    background: rgba(244, 67, 54, 0.2) !important;
+}
+button { padding: 10px 20px; font-size: 16px; border-radius: 8px; border: none; background: purple; color: white; cursor: pointer; margin: 5px; }
 button:hover { background: #800080; }
+.mode-btn { background: #6a0dad; margin: 10px 5px; }
+#cropModeBtn.active { background: #4CAF50; }
+#watermarkModeBtn.active { background: #f44336; }
+#applyBtn { background: #28a745; width: 200px; font-size: 18px; }
 
 /* بلور و اسپینر */
 #drop-zone.loading img,
@@ -141,16 +217,19 @@ button:hover { background: #800080; }
 </style>
 </head>
 <body>
-<h1>حذف واترمارک ساده</h1>
+<h1>ابزار ویرایش تصویر</h1>
 <div class="title-line"></div>
 <div class="container">
     <div id="drop-zone">تصویر خود را پیست کنید، بکشید یا انتخاب کنید<div id="spinner"></div></div>
     <input type="file" id="imageInput" accept="image/*">
     <br>
-    <label for="colorPicker">رنگ باکس:</label>
+    <button id="cropModeBtn" class="mode-btn" onclick="toggleMode('crop')">انتخاب ناحیه کراپ</button>
+    <button id="watermarkModeBtn" class="mode-btn" onclick="toggleMode('watermark')">انتخاب ناحیه واترمارک</button>
+    <br>
+    <label for="colorPicker" id="colorLabel">رنگ پر کردن واترمارک:</label>
     <input type="color" id="colorPicker" value="#ffffff">
     <br>
-    <button onclick="submitBox()">انجام</button>
+    <button id="applyBtn" onclick="applyAll()">انجام ویرایش</button>
     <div id="output"></div>
 </div>
 
@@ -158,7 +237,8 @@ button:hover { background: #800080; }
 let selectedFile = null;
 let startX = 0, startY = 0, endX = 0, endY = 0;
 let isDrawing = false;
-let boxCoords = null;
+let boxCoords = { crop: null, watermark: null };
+let currentMode = null;
 let activeImg = null;
 let imgOffsetX = 0, imgOffsetY = 0;
 
@@ -166,14 +246,17 @@ const dropZone = document.getElementById('drop-zone');
 const fileInput = document.getElementById('imageInput');
 const outputDiv = document.getElementById('output');
 const spinner = document.getElementById('spinner');
+const cropModeBtn = document.getElementById('cropModeBtn');
+const watermarkModeBtn = document.getElementById('watermarkModeBtn');
+const colorPicker = document.getElementById('colorPicker');
+const colorLabel = document.getElementById('colorLabel');
+const applyBtn = document.getElementById('applyBtn');
 
-const selectionBox = document.createElement('div');
-selectionBox.classList.add('selection-box');
-dropZone.appendChild(selectionBox);
+let cropBox, watermarkBox;
 
 // کلیک روی drop zone باز کردن فایل
 dropZone.addEventListener('click', (e) => {
-    if(!selectedFile && e.target === dropZone) fileInput.click();
+    if(!selectedFile && e.target === dropZone && !isDrawing) fileInput.click();
 });
 
 // انتخاب فایل از دیالوگ
@@ -202,8 +285,30 @@ window.addEventListener('paste', e => {
     }
 });
 
+function toggleMode(mode) {
+    currentMode = mode;
+    isDrawing = false;
+
+    // Reset buttons
+    cropModeBtn.classList.remove('active');
+    watermarkModeBtn.classList.remove('active');
+
+    if (mode === 'crop') {
+        cropModeBtn.classList.add('active');
+        if (activeImg) enableBoxDraw(activeImg, 'crop');
+    } else if (mode === 'watermark') {
+        watermarkModeBtn.classList.add('active');
+        if (activeImg) enableBoxDraw(activeImg, 'watermark');
+    }
+}
+
 function setSelectedFile(file){
     selectedFile = file;
+    boxCoords = { crop: null, watermark: null };
+    currentMode = null;
+    isDrawing = false;
+    if (cropBox) cropBox.style.display = 'none';
+    if (watermarkBox) watermarkBox.style.display = 'none';
     dropZone.innerHTML = '';
     const img = document.createElement('img');
     img.src = URL.createObjectURL(file);
@@ -222,25 +327,52 @@ function setSelectedFile(file){
         selectedFile = null;
         activeImg = null;
         isDrawing = false;
-        boxCoords = null;
-        selectionBox.style.display = 'none';
+        boxCoords = { crop: null, watermark: null };
+        currentMode = null;
+        cropModeBtn.classList.remove('active');
+        watermarkModeBtn.classList.remove('active');
+        if (cropBox) cropBox.style.display = 'none';
+        if (watermarkBox) watermarkBox.style.display = 'none';
         dropZone.innerHTML = 'تصویر خود را پیست کنید، بکشید یا انتخاب کنید';
         dropZone.appendChild(spinner);
-        dropZone.appendChild(selectionBox);
+        dropZone.appendChild(cropBox || createBoxes());
+        dropZone.appendChild(watermarkBox || createBoxes());
         outputDiv.style.display = 'none';
     });
     dropZone.appendChild(removeBtn);
 
-    dropZone.appendChild(selectionBox);
-    selectionBox.style.display = 'none';
+    // Create boxes if not exist
+    createBoxes();
+    dropZone.appendChild(cropBox);
+    dropZone.appendChild(watermarkBox);
     dropZone.appendChild(spinner);
     outputDiv.style.display = 'none';
 
-    img.onload = () => { activeImg = img; enableBoxDraw(img); };
+    img.onload = () => { 
+        activeImg = img; 
+        // Reset modes
+        cropModeBtn.classList.remove('active');
+        watermarkModeBtn.classList.remove('active');
+        currentMode = null;
+    };
 }
 
-function enableBoxDraw(imgElem){
-    imgElem.addEventListener('mousedown', (e) => {
+function createBoxes() {
+    if (!cropBox) {
+        cropBox = document.createElement('div');
+        cropBox.classList.add('selection-box', 'crop-box');
+        cropBox.style.display = 'none';
+    }
+    if (!watermarkBox) {
+        watermarkBox = document.createElement('div');
+        watermarkBox.classList.add('selection-box', 'watermark-box');
+        watermarkBox.style.display = 'none';
+    }
+}
+
+function enableBoxDraw(imgElem, mode) {
+    const selectionBox = mode === 'crop' ? cropBox : watermarkBox;
+    const handleMouseDown = (e) => {
         e.preventDefault(); e.stopPropagation();
         isDrawing = true;
         const imgRect = imgElem.getBoundingClientRect();
@@ -255,9 +387,9 @@ function enableBoxDraw(imgElem){
         selectionBox.style.width = "0px";
         selectionBox.style.height = "0px";
         selectionBox.style.display = "block";
-    });
+    };
 
-    imgElem.addEventListener('mousemove', (e) => {
+    const handleMouseMove = (e) => {
         if(!isDrawing) return;
         const imgRect = imgElem.getBoundingClientRect();
         endX = e.clientX - imgRect.left;
@@ -268,9 +400,9 @@ function enableBoxDraw(imgElem){
         selectionBox.style.top = (imgOffsetY + minY) + "px";
         selectionBox.style.width = Math.abs(endX - startX) + "px";
         selectionBox.style.height = Math.abs(endY - startY) + "px";
-    });
+    };
 
-    window.addEventListener('mouseup', (e) => {
+    const handleMouseUp = (e) => {
         if(!isDrawing || !activeImg) return;
         isDrawing = false;
         const rect = activeImg.getBoundingClientRect();
@@ -282,38 +414,68 @@ function enableBoxDraw(imgElem){
         const dispY2 = Math.round(Math.max(startY, mouseY));
         const scaleX = activeImg.naturalWidth / rect.width;
         const scaleY = activeImg.naturalHeight / rect.height;
-        boxCoords = {
+        const coords = {
             x1: Math.round(dispX1 * scaleX),
             y1: Math.round(dispY1 * scaleY),
             x2: Math.round(dispX2 * scaleX),
             y2: Math.round(dispY2 * scaleY),
         };
-    });
+        boxCoords[mode] = coords;
+        selectionBox.style.display = 'block'; // Keep visible
+    };
+
+    // Remove previous listeners if any
+    if (imgElem._mousedownHandler) imgElem.removeEventListener('mousedown', imgElem._mousedownHandler);
+    if (imgElem._mousemoveHandler) imgElem.removeEventListener('mousemove', imgElem._mousemoveHandler);
+    if (imgElem._mouseupHandler) window.removeEventListener('mouseup', imgElem._mouseupHandler);
+
+    // Add new listeners
+    imgElem._mousedownHandler = handleMouseDown;
+    imgElem._mousemoveHandler = handleMouseMove;
+    imgElem._mouseupHandler = handleMouseUp;
+
+    imgElem.addEventListener('mousedown', imgElem._mousedownHandler);
+    imgElem.addEventListener('mousemove', imgElem._mousemoveHandler);
+    window.addEventListener('mouseup', imgElem._mouseupHandler);
 }
 
-function submitBox(){
-    if(!selectedFile || !boxCoords) return;
-    const color = document.getElementById('colorPicker').value;
+function applyAll(){
+    if(!selectedFile) return alert('لطفا ابتدا یک تصویر انتخاب کنید!');
+    if(!boxCoords.crop && !boxCoords.watermark) return alert('لطفا حداقل یک ناحیه (کراپ یا واترمارک) انتخاب کنید!');
+
     const formData = new FormData();
     formData.append('image', selectedFile);
-    formData.append('x1', boxCoords.x1);
-    formData.append('y1', boxCoords.y1);
-    formData.append('x2', boxCoords.x2);
-    formData.append('y2', boxCoords.y2);
-    formData.append('color', color);
+
+    if (boxCoords.crop) {
+        formData.append('x1_c', boxCoords.crop.x1);
+        formData.append('y1_c', boxCoords.crop.y1);
+        formData.append('x2_c', boxCoords.crop.x2);
+        formData.append('y2_c', boxCoords.crop.y2);
+    }
+
+    if (boxCoords.watermark) {
+        formData.append('x1_w', boxCoords.watermark.x1);
+        formData.append('y1_w', boxCoords.watermark.y1);
+        formData.append('x2_w', boxCoords.watermark.x2);
+        formData.append('y2_w', boxCoords.watermark.y2);
+        formData.append('color', colorPicker.value);
+    }
 
     // فعال کردن بلور و اسپینر
     dropZone.classList.add('loading');
     spinner.style.display = 'block';
 
-    fetch('/apply-box', {method:'POST', body: formData})
+    fetch('/apply-all', {method:'POST', body: formData})
     .then(res => res.blob())
     .then(blob => {
         const url = URL.createObjectURL(blob);
-        outputDiv.innerHTML = `<img src="${url}" alt="With Box">`;
+        outputDiv.innerHTML = `<img src="${url}" alt="Edited">`;
         outputDiv.style.display = 'block';
+        // Hide boxes after apply
+        if (cropBox) cropBox.style.display = 'none';
+        if (watermarkBox) watermarkBox.style.display = 'none';
     })
-    .catch(err => console.error(err))
+    .catch(err => alert('خطا در پردازش تصویر!'))
     .finally(() => {
         // برداشتن بلور و اسپینر
         dropZone.classList.remove('loading');

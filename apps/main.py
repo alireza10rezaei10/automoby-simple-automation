@@ -71,11 +71,8 @@ main_html = """
         <a href="/attributes-scraping">
             <div class="card">اتریبیوت اسکریپینگ</div>
         </a>
-        <a href="/image-cropper">
-            <div class="card">کراپ عکس</div>
-        </a>
-        <a href="/simple-watermark">
-            <div class="card">حذف واتر مارک ساده</div>
+        <a href="/photoshop">
+            <div class="card">فتوشاپ</div>
         </a>
     </div>
 </body>
