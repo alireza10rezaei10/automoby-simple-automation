@@ -74,6 +74,9 @@ main_html = """
         <a href="/image-cropper">
             <div class="card">کراپ عکس</div>
         </a>
+        <a href="/simple-watermark">
+            <div class="card">حذف واتر مارک ساده</div>
+        </a>
     </div>
 </body>
 </html>
