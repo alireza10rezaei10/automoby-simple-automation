@@ -68,6 +68,7 @@ h1 { color: purple; margin-bottom: 5px; }
     color: #666; cursor: pointer; background: #fff; text-align: center; 
     padding: 10px; position: relative; overflow: hidden; transition: 0.3s; 
 }
+#drop-zone.dragover { background: #f0e6ff; border-color: #800080; }
 #drop-zone img { max-width: 100%; max-height: 500px; display: block; margin: auto; user-select: none; -webkit-user-drag: none; }
 
 .remove-btn {
@@ -109,13 +110,41 @@ input[type=file] { display: none; }
 }
 button { padding: 10px 20px; font-size: 16px; border-radius: 8px; border: none; background: purple; color: white; cursor: pointer; margin-top: 15px; }
 button:hover { background: #800080; }
+
+/* بلور و اسپینر */
+#drop-zone.loading img,
+#drop-zone.loading .remove-btn,
+#drop-zone.loading .selection-box {
+    filter: blur(3px);
+    pointer-events: none;
+}
+
+#spinner {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    border: 6px solid #f3f3f3;
+    border-top: 6px solid purple;
+    border-radius: 50%;
+    width: 50px;
+    height: 50px;
+    animation: spin 1s linear infinite;
+    display: none;
+    z-index: 10;
+}
+
+@keyframes spin {
+    0% { transform: translate(-50%, -50%) rotate(0deg); }
+    100% { transform: translate(-50%, -50%) rotate(360deg); }
+}
 </style>
 </head>
 <body>
 <h1>حذف واترمارک ساده</h1>
 <div class="title-line"></div>
 <div class="container">
-    <div id="drop-zone">تصویر خود را انتخاب کنید</div>
+    <div id="drop-zone">تصویر خود را پیست کنید، بکشید یا انتخاب کنید<div id="spinner"></div></div>
     <input type="file" id="imageInput" accept="image/*">
     <br>
     <label for="colorPicker">رنگ باکس:</label>
@@ -136,25 +165,46 @@ let imgOffsetX = 0, imgOffsetY = 0;
 const dropZone = document.getElementById('drop-zone');
 const fileInput = document.getElementById('imageInput');
 const outputDiv = document.getElementById('output');
+const spinner = document.getElementById('spinner');
 
 const selectionBox = document.createElement('div');
 selectionBox.classList.add('selection-box');
 dropZone.appendChild(selectionBox);
 
+// کلیک روی drop zone باز کردن فایل
 dropZone.addEventListener('click', (e) => {
     if(!selectedFile && e.target === dropZone) fileInput.click();
 });
 
+// انتخاب فایل از دیالوگ
 fileInput.addEventListener('change', () => {
     if(fileInput.files.length) setSelectedFile(fileInput.files[0]);
+});
+
+// Drag & Drop
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('dragover'); });
+dropZone.addEventListener('dragleave', e => { e.preventDefault(); dropZone.classList.remove('dragover'); });
+dropZone.addEventListener('drop', e => {
+    e.preventDefault();
+    dropZone.classList.remove('dragover');
+    if(e.dataTransfer.files.length) {
+        setSelectedFile(e.dataTransfer.files[0]);
+    }
+});
+
+// Paste
+window.addEventListener('paste', e => {
+    const items = e.clipboardData.items;
+    for(let i=0;i<items.length;i++){
+        if(items[i].type.indexOf('image') !== -1){
+            setSelectedFile(items[i].getAsFile());
+        }
+    }
 });
 
 function setSelectedFile(file){
     selectedFile = file;
     dropZone.innerHTML = '';
-    dropZone.appendChild(selectionBox);
-    selectionBox.style.display = 'none';
-
     const img = document.createElement('img');
     img.src = URL.createObjectURL(file);
     img.draggable = false;
@@ -174,11 +224,17 @@ function setSelectedFile(file){
         isDrawing = false;
         boxCoords = null;
         selectionBox.style.display = 'none';
-        dropZone.innerHTML = 'تصویر خود را انتخاب کنید';
+        dropZone.innerHTML = 'تصویر خود را پیست کنید، بکشید یا انتخاب کنید';
+        dropZone.appendChild(spinner);
         dropZone.appendChild(selectionBox);
         outputDiv.style.display = 'none';
     });
     dropZone.appendChild(removeBtn);
+
+    dropZone.appendChild(selectionBox);
+    selectionBox.style.display = 'none';
+    dropZone.appendChild(spinner);
+    outputDiv.style.display = 'none';
 
     img.onload = () => { activeImg = img; enableBoxDraw(img); };
 }
@@ -246,6 +302,10 @@ function submitBox(){
     formData.append('y2', boxCoords.y2);
     formData.append('color', color);
 
+    // فعال کردن بلور و اسپینر
+    dropZone.classList.add('loading');
+    spinner.style.display = 'block';
+
     fetch('/apply-box', {method:'POST', body: formData})
     .then(res => res.blob())
     .then(blob => {
@@ -253,7 +313,12 @@ function submitBox(){
         outputDiv.innerHTML = `<img src="${url}" alt="With Box">`;
         outputDiv.style.display = 'block';
     })
-    .catch(err => console.error(err));
+    .catch(err => console.error(err))
+    .finally(() => {
+        // برداشتن بلور و اسپینر
+        dropZone.classList.remove('loading');
+        spinner.style.display = 'none';
+    });
 }
 </script>
 </body>
