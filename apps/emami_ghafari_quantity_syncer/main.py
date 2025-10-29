@@ -231,9 +231,6 @@ main_html = """
             progressBar.max = totalPages;
             progressBar.value = parseInt(current);
             progressText.innerText = `${progressBar.value} از ${totalPages} صفحه`;
-          } else if(msg.msg.includes('دریافت شد:')) {
-            // Show final product count
-            progressText.innerText = msg.msg;
           }
         }
         else if(msg.type === 'ERROR') {
