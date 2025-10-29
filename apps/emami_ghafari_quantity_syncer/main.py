@@ -67,7 +67,7 @@ def generate() -> Generator[str, None, None]:
                 yield sse(
                     {
                         "type": "STATUS",
-                        "msg": f"صفحه {page} از {total_pages} دریافت شد ({total_count} محصول)",
+                        "msg": f"صفحه {page} از {total_pages} دریافت شد...",
                     }
                 )
                 time.sleep(0.2)
