@@ -1,2 +1,2 @@
-docker build -t myapp .
-docker run -p 8000:80 myapp
+docker build -t automoby-automation .
+docker run -p 8000:80 automoby-automation

@@ -74,6 +74,9 @@ main_html = """
         <a href="/photoshop">
             <div class="card">فتوشاپ</div>
         </a>
+        <a href="/emami-ghafari-sync">
+            <div class="card">به‌روزرسانی موجودی/قیمت امامی غفاری</div>
+        </a>
     </div>
 </body>
 </html>

@@ -12,6 +12,7 @@ from apps import (
     digi_attributes_scraping,
     photoshop,
 )
+from apps.emami_ghafari_quantity_syncer import main as emami_ghafari_quantity_syncer
 import cv2
 import numpy as np
 from PIL import Image
@@ -57,6 +58,21 @@ def scrape():
 @app.route("/photoshop")
 def photoshop_main():
     return render_template_string(photoshop.html_ui)
+
+
+# ---------------------------------
+# emami ghafari syncer -------------
+# ---------------------------------
+@app.route("/emami-ghafari-sync")
+def emami_sync_page():
+    return render_template_string(emami_ghafari_quantity_syncer.main_html)
+
+
+@app.route("/emami-ghafari-sync-run")
+def emami_sync_run():
+    return Response(
+        emami_ghafari_quantity_syncer.generate(), mimetype="text/event-stream"
+    )
 
 
 @app.route("/apply-all", methods=["POST"])
