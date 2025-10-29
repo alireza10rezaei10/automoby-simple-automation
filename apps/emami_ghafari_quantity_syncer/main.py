@@ -57,15 +57,17 @@ def generate() -> Generator[str, None, None]:
             }
         )
 
+        total_count = len(products)
         for page in range(2, total_pages + 1):
             try:
                 page_resp = crawler._fetch_page_products(page=page)
                 count = len(page_resp.get("products") or [])
+                total_count += count
                 products.extend(page_resp.get("products") or [])
                 yield sse(
                     {
                         "type": "STATUS",
-                        "msg": f"صفحه {page} از {total_pages} دریافت شد ({count} محصول)",
+                        "msg": f"صفحه {page} از {total_pages} دریافت شد ({total_count} محصول)",
                     }
                 )
                 time.sleep(0.2)
@@ -231,6 +233,9 @@ main_html = """
             progressBar.max = totalPages;
             progressBar.value = parseInt(current);
             progressText.innerText = `${progressBar.value} از ${totalPages} صفحه`;
+          } else if(msg.msg.includes('دریافت شد:')) {
+            // Show final product count
+            progressText.innerText = msg.msg;
           }
         }
         else if(msg.type === 'ERROR') {
