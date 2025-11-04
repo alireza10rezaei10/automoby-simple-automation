@@ -77,6 +77,9 @@ main_html = """
         <a href="/emami-ghafari-sync">
             <div class="card">به‌روزرسانی موجودی/قیمت امامی غفاری</div>
         </a>
+        <a href="http://172.16.10.122:8501">
+            <div class="card">ALookup</div>
+        </a>
     </div>
 </body>
 </html>
