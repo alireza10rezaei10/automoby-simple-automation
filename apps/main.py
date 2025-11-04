@@ -80,6 +80,9 @@ main_html = """
         <a href="http://172.16.10.122:8501">
             <div class="card">ALookup</div>
         </a>
+        <a href="http://172.16.10.122:67895">
+            <div class="card">متین - انتخاب عکس مناسب</div>
+        </a>
     </div>
 </body>
 </html>
