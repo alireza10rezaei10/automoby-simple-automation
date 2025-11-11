@@ -20,6 +20,7 @@ class Main:
         return [
             {
                 "name": product.get("name"),
+                "technical_number": product.get("sku"),
                 "quantity": product.get("add_to_cart").get("maximum"),
                 "in_stock": product.get("stock_availability").get("text"),
                 "price": product.get("prices").get("price"),
