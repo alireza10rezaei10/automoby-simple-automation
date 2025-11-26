@@ -22,12 +22,14 @@ class Main:
                 "name": product.get("name"),
                 "technical_number": product.get("sku"),
                 "quantity": product.get("add_to_cart").get("maximum"),
+                "categories": product.get("categories")[0].get("name") if product.get("categories") is not None and len(product.get("categories")) > 0 else None,
                 "in_stock": product.get("stock_availability").get("text"),
                 "price": product.get("prices").get("price"),
                 "regular_price": product.get("prices").get("regular_price"),
                 "sale_price": product.get("prices").get("sale_price"),
                 "currency_symbol": product.get("prices").get("currency_symbol"),
                 "url": product.get("permalink"),
+
             }
             for product in products
         ]
