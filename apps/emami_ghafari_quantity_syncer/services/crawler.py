@@ -22,7 +22,7 @@ class Main:
                 "name": product.get("name"),
                 "technical_number": product.get("sku"),
                 "quantity": product.get("add_to_cart").get("maximum"),
-                "categories": [cat.get("name") for cat in product.get("categories")],
+                "categories": "-".join([cat.get("name") for cat in product.get("categories")]),
                 "in_stock": product.get("stock_availability").get("text"),
                 "price": product.get("prices").get("price"),
                 "regular_price": product.get("prices").get("regular_price"),
